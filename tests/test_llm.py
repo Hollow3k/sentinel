@@ -1,6 +1,4 @@
 from app import llm
-from tests.conftest import ANALYST
-
 FACTS = {"amount": 120.5, "score": 0.97, "hour_of_day": 3, "threshold": 0.94,
          "top_features": [{"feature": "V14", "contribution": 2.1, "value": -8.0}]}
 
@@ -48,7 +46,7 @@ def test_template_is_grounded():
 def test_grounded_llm_text_is_used(client, flagged_tx, monkeypatch):
     # The template is grounded by construction, so it stands in for a well-behaved LLM answer.
     monkeypatch.setattr(llm, "generate_once", llm.template)
-    r = client.post(f"/flags/{flagged_tx['id']}/summary", headers=ANALYST)
+    r = client.post(f"/flags/{flagged_tx['id']}/summary")
     assert r.status_code == 200
     assert r.json()["source"] == "llm"
     assert r.json()["summary"]
@@ -61,7 +59,7 @@ def test_ungrounded_llm_text_falls_back_to_template(client, flagged_tx, monkeypa
         calls.append(1)
         return "The amount was 99999 and the cardholder looks suspicious."
     monkeypatch.setattr(llm, "generate_once", fake)
-    r = client.post(f"/flags/{flagged_tx['id']}/summary", headers=ANALYST)
+    r = client.post(f"/flags/{flagged_tx['id']}/summary")
     assert r.json()["source"] == "template"
     assert len(calls) == 3  # first attempt + 2 retries, all ungrounded
 
@@ -70,20 +68,20 @@ def test_llm_exception_falls_back_to_template(client, flagged_tx, monkeypatch):
     def fake(facts):
         raise RuntimeError("network down")
     monkeypatch.setattr(llm, "generate_once", fake)
-    r = client.post(f"/flags/{flagged_tx['id']}/summary", headers=ANALYST)
+    r = client.post(f"/flags/{flagged_tx['id']}/summary")
     assert r.status_code == 200
     assert r.json()["source"] == "template"
 
 
 def test_summary_is_saved_on_the_transaction(client, flagged_tx, monkeypatch):
     monkeypatch.setattr(llm, "generate_once", lambda facts: llm.template(facts))
-    text = client.post(f"/flags/{flagged_tx['id']}/summary", headers=ANALYST).json()["summary"]
-    flags = client.get("/flags", headers=ANALYST).json()
+    text = client.post(f"/flags/{flagged_tx['id']}/summary").json()["summary"]
+    flags = client.get("/flags").json()
     assert flags[0]["summary"] == text
 
 
 def test_summary_for_unknown_id_is_404(client):
-    assert client.post("/flags/9999/summary", headers=ANALYST).status_code == 404
+    assert client.post("/flags/9999/summary").status_code == 404
 
 
 # ---- generate_once -----------------------------------------------------------

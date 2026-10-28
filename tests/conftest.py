@@ -11,7 +11,6 @@ from pathlib import Path
 _TMP = Path(tempfile.mkdtemp(prefix="sentinel-test-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["ADMIN_API_KEY"] = "test-admin-key"
-os.environ["ANALYST_API_KEY"] = "test-analyst-key"
 os.environ["GROQ_API_KEY"] = "unused-in-tests"  # set so a developer's real key is never loaded
 
 import pytest
@@ -22,7 +21,6 @@ from app.db import Base, engine
 from app.main import app
 
 ADMIN = {"X-API-Key": "test-admin-key"}
-ANALYST = {"X-API-Key": "test-analyst-key"}
 
 # Two real rows from the held-out test split (public Kaggle data), so CI needs no dataset.
 SAMPLES = json.loads((Path(__file__).parent / "sample_rows.json").read_text())

@@ -5,3 +5,4 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "app.auth.require_
 # ml/train.py is the frozen script that produced models/*.json; it is left exactly as run.
 [lint.per-file-ignores]
 "ml/train.py" = ["E401", "I001", "SIM115"]
+"tests/conftest.py" = ["E402"]

@@ -7,7 +7,7 @@ from fastapi import Header, HTTPException
 
 def require_role(*allowed):
     def dep(x_api_key: str | None = Header(default=None)):
-        keys = {"admin": os.getenv("ADMIN_API_KEY"), "analyst": os.getenv("ANALYST_API_KEY")}
+        keys = {"admin": os.getenv("ADMIN_API_KEY")}
         role = next((r for r, k in keys.items()
                      if k and x_api_key and secrets.compare_digest(k, x_api_key)), None)
         if role is None:

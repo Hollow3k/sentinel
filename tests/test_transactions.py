@@ -4,6 +4,7 @@ import math
 import pytest
 
 from app import scoring
+from app.db import Transaction
 from tests.conftest import ADMIN
 
 
@@ -44,6 +45,41 @@ def test_same_key_with_different_payload_is_409(post_tx, legit):
     assert post_tx(legit, key="conflict-key-1").status_code == 201
     changed = {**legit, "Amount": legit["Amount"] + 1}
     assert post_tx(changed, key="conflict-key-1").status_code == 409
+
+
+def test_concurrent_different_payload_is_409(client, legit, monkeypatch):
+    from app import main
+    from sqlalchemy.exc import IntegrityError
+
+    session_factory = main.SessionLocal
+    db = session_factory()
+    winner = Transaction(
+        idempotency_key="race-key-1", features=legit, time_seconds=0, amount=1,
+        hour_of_day=0, bucket=0, score=0, source="fallback_rules", flagged=False,
+    )
+    db.add(winner)
+    db.commit()
+    db.close()
+    monkeypatch.setattr(scoring, "score", lambda features: {
+        "score": 0.1, "source": "model", "flagged": False, "explanation": [],
+    })
+
+    class RaceSession:
+        def __init__(self):
+            self.db = session_factory()
+        def __getattr__(self, name):
+            return getattr(self.db, name)
+        def commit(self):
+            raise IntegrityError("duplicate", {}, None)
+        def close(self):
+            self.db.close()
+
+    monkeypatch.setattr(main, "SessionLocal", RaceSession)
+    changed = {**legit, "Amount": legit["Amount"] + 1}
+    response = client.post("/transactions", headers=ADMIN, json={
+        "idempotency_key": "race-key-1", "features": changed,
+    })
+    assert response.status_code == 409
 
 
 def _without(features, name):
@@ -113,3 +149,10 @@ def test_service_starts_without_a_model_when_loading_fails(monkeypatch, legit):
                    json={"idempotency_key": "no-model-0001", "features": legit})
         assert r.status_code == 201
         assert r.json()["source"] == "fallback_rules"
+
+
+def test_demo_seed_is_public_and_creates_transactions(client):
+    r = client.post("/demo/seed")
+    assert r.status_code == 200
+    assert r.json() == {"created": 10}
+    assert len(client.get("/flags").json()) >= 1

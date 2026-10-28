@@ -8,3 +8,5 @@ __pycache__/
 dashboard/node_modules/
 dashboard/dist/
 eval_results.json
+dashboard/.vite/
+dashboard/package-lock.json

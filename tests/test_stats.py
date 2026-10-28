@@ -1,8 +1,5 @@
-from tests.conftest import ANALYST
-
-
 def test_stats_on_empty_database(client):
-    r = client.get("/stats", headers=ANALYST)
+    r = client.get("/stats")
     assert r.status_code == 200
     assert r.json() == {"hourly": [], "score_buckets": [], "reviews": []}
 
@@ -11,7 +8,7 @@ def test_stats_shape_and_values(client, post_tx, legit, fraud):
     # legit row: Time -> hour_of_day computed from the row; fraud row is flagged.
     post_tx(legit, key="stats-legit-01")
     post_tx(fraud, key="stats-fraud-01")
-    body = client.get("/stats", headers=ANALYST).json()
+    body = client.get("/stats").json()
 
     assert set(body) == {"hourly", "score_buckets", "reviews"}
     for row in body["hourly"]:
@@ -35,9 +32,9 @@ def test_stats_review_percentages(client, post_tx, fraud, legit, monkeypatch):
     ids = [post_tx(fraud, key=f"pct-key-000{i}").json()["id"] for i in range(3)]
     decisions = ["confirm_fraud", "confirm_fraud", "dismiss"]
     for tx_id, d in zip(ids, decisions):
-        assert client.post(f"/flags/{tx_id}/review", headers=ANALYST,
+        assert client.post(f"/flags/{tx_id}/review",
                            json={"decision": d}).status_code == 200
-    reviews = {r["decision"]: r for r in client.get("/stats", headers=ANALYST).json()["reviews"]}
+    reviews = {r["decision"]: r for r in client.get("/stats").json()["reviews"]}
     assert reviews["confirm_fraud"]["n"] == 2
     assert reviews["dismiss"]["n"] == 1
     assert round(reviews["confirm_fraud"]["pct"] + reviews["dismiss"]["pct"], 1) == 100.0
