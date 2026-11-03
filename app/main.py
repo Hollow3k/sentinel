@@ -1,5 +1,7 @@
 import logging
 import json
+import logging
+import random
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,7 +22,11 @@ from app.schemas import ReviewIn, TxIn
 
 logging.basicConfig(level=logging.INFO, format="time=%(asctime)s level=%(levelname)s %(message)s")
 log = logging.getLogger("sentinel")
-DEMO_ROWS = json.loads((Path(__file__).parent / "demo_rows.json").read_text())
+
+# 50 fraud + 250 legit rows from the held-out test split, pre-scored by model at train time.
+# Used only by /demo/seed so the live API never touches the training data.
+_DEMO_PATH = Path(__file__).parent / "demo_rows.json"
+DEMO_POOL: dict[str, list] = json.loads(_DEMO_PATH.read_text()) if _DEMO_PATH.exists() else {}
 
 
 @asynccontextmanager
@@ -107,10 +113,22 @@ def create_tx(body: TxIn, response: Response, db: Session = Depends(get_db),
 
 @app.post("/demo/seed")
 def seed_demo(db: Session = Depends(get_db)):
+    """Insert a random mix of 10 fraud + 20 legit transactions from the held-out pool.
+
+    Each call picks a different random subset so the dashboard shows varied amounts,
+    hours, scores, and top SHAP features rather than the same row repeated.
+    Auth is intentionally omitted here — this endpoint exists only for the demo.
+    """
+    if not DEMO_POOL:
+        raise HTTPException(503, "demo data not available")
+
+    fraud_sample = random.sample(DEMO_POOL["fraud"], k=min(10, len(DEMO_POOL["fraud"])))
+    legit_sample = random.sample(DEMO_POOL["legit"], k=min(20, len(DEMO_POOL["legit"])))
+    rows = fraud_sample + legit_sample
+    random.shuffle(rows)
+
     created = 0
-    for index in range(10):
-        label = "fraud" if index % 3 == 0 else "legit"
-        features = DEMO_ROWS[label]
+    for features in rows:
         result = scoring.score(features)
         transaction = Transaction(
             idempotency_key=f"demo-{uuid.uuid4().hex}",

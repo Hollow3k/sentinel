@@ -152,7 +152,19 @@ def test_service_starts_without_a_model_when_loading_fails(monkeypatch, legit):
 
 
 def test_demo_seed_is_public_and_creates_transactions(client):
+    # Each call draws 10 fraud + 20 legit = 30 random rows from the held-out pool.
     r = client.post("/demo/seed")
     assert r.status_code == 200
-    assert r.json() == {"created": 10}
-    assert len(client.get("/flags").json()) >= 1
+    assert r.json()["created"] == 30
+    # At least some of those fraud rows must be flagged.
+    flags = client.get("/flags", headers=ADMIN).json()
+    assert len(flags) >= 1
+
+
+def test_demo_seed_is_varied_across_calls(client):
+    client.post("/demo/seed")
+    client.post("/demo/seed")
+    flags = client.get("/flags", headers=ADMIN).json()
+    amounts = [f["amount"] for f in flags]
+    # 60 rows drawn from 300 diverse rows must have more than one unique amount.
+    assert len(set(amounts)) > 1
