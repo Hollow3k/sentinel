@@ -113,4 +113,3 @@ For PostgreSQL Compose and the single-instance EC2 procedure, see
 - Admin ingestion is protected by a shared API key, but dashboard reads and reviews are
   intentionally public for this demo. Do not expose this mode to sensitive data without
   adding analyst authentication, TLS, rate limits, and stronger observability.
-- The current schema is created automatically and has no migration history.
